@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    {% if household %}
+        <h1>{{ household.name }}</h1>
+        <p class="muted">Invite code: <strong>{{ household.code }}</strong></p>
+
+        <h2>Members</h2>
+        <ul>
+            {% for member in members %}
+                <li>{{ member.user.username }}</li>
+            {% empty %}
+                <li>No members yet.</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <h1>Welcome</h1>
+        <p>Create your household or join one with a code.</p>
+
+        <div class="grid">
+            <div>
+                <h2>Create household</h2>
+                <form method="post" action="{% url 'create_household' %}">
+                    {% csrf_token %}
+                    {{ create_form.as_p }}
+                    <button type="submit">Create household</button>
+                </form>
+            </div>
+
+            <div>
+                <h2>Join household</h2>
+                <form method="post" action="{% url 'join_household' %}">
+                    {% csrf_token %}
+                    {{ join_form.as_p }}
+                    <button type="submit">Join household</button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
