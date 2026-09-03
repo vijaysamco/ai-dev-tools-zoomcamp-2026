@@ -30,6 +30,38 @@
         </div>
 
         <h2>Household chores</h2>
+
+        <form method="get" style="margin: 1rem 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; align-items: end;">
+            <div>
+                <label for="assignee">Assignee</label><br>
+                <select id="assignee" name="assignee">
+                    <option value="">All members</option>
+                    {% for member in members %}
+                        <option value="{{ member.user.id }}" {% if assignee_filter == member.user.id|stringformat:'s' %}selected{% endif %}>{{ member.user.username }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="status">Status</label><br>
+                <select id="status" name="status">
+                    <option value="">All statuses</option>
+                    {% for value, label in status_choices %}
+                        <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="q">Search</label><br>
+                <input id="q" type="text" name="q" value="{{ search_query }}" placeholder="Search chores">
+            </div>
+            <div>
+                <button type="submit">Apply filters</button>
+                {% if assignee_filter or status_filter or search_query %}
+                    <a href="{% url 'dashboard' %}" style="margin-left: 0.75rem;">Clear</a>
+                {% endif %}
+            </div>
+        </form>
+
         {% if chores %}
             <table style="width:100%; border-collapse: collapse; margin-top:1rem;">
                 <thead>
@@ -61,7 +93,7 @@
                 </tbody>
             </table>
         {% else %}
-            <p class="muted">No chores yet. Create the first one above.</p>
+            <p class="muted">No chores match the current filters. Try clearing them or add a new chore.</p>
         {% endif %}
 
         <h2>Recent activity</h2>

@@ -28,12 +28,35 @@ This project helps a household coordinate day-to-day chores with a shared task b
 - fairness points or scoreboards
 - mobile app
 
+## Local development setup
+1. Create a local virtual environment.
+2. Install dependencies from `requirements.txt`.
+3. Copy `.env.example` to `.env` and update the values for your local environment.
+4. Run database migrations.
+5. Start the app with `python manage.py runserver`.
+
+Example:
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py runserver
+```
+
+## Deployment notes
+- Keep `DEBUG=False` in production.
+- Use a strong secret key via `DJANGO_SECRET_KEY`.
+- Configure `DJANGO_ALLOWED_HOSTS` for the production host.
+- Use a production database and secure credentials instead of the default local SQLite setup.
+
 ## Project status
-This repository is currently in planning and scope definition. The goal is to deliver a focused MVP before expanding into recurring schedules or advanced features.
+This repository is currently in the MVP phase for a shared household chore app. The project is scoped to the essentials: household membership, chore assignment, status tracking, dashboard filtering, testing, and deployment-ready configuration.
 
 ## Next steps
-1. Define data model
-2. Create the app structure
-3. Implement authentication and household membership
-4. Build chore CRUD and dashboard UI
-5. Add testing and deployment
+1. Finalize deployment configuration
+2. Add a production database setup
+3. Review security settings before deployment
+4. Expand only after the MVP is stable

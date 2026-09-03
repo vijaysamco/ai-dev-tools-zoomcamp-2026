@@ -33,11 +33,27 @@ def dashboard(request):
     if household:
         members = household.members.select_related('user').all()
         chores = household.chores.select_related('assignee', 'created_by').all()
+
+        assignee_id = request.GET.get('assignee')
+        status = request.GET.get('status')
+        search_query = (request.GET.get('q') or '').strip()
+
+        if assignee_id:
+            chores = chores.filter(assignee_id=assignee_id)
+        if status:
+            chores = chores.filter(status=status)
+        if search_query:
+            chores = chores.filter(title__icontains=search_query)
+
         activity = ChoreActivity.objects.filter(chore__household=household).select_related('user', 'chore')[:10]
         context['members'] = members
         context['chores'] = chores
         context['chore_form'] = ChoreForm(household=household)
         context['activity'] = activity
+        context['status_choices'] = Chore.STATUS_CHOICES
+        context['assignee_filter'] = assignee_id
+        context['status_filter'] = status
+        context['search_query'] = search_query
 
     return render(request, 'dashboard.html', context)
 

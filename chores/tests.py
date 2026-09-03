@@ -35,6 +35,30 @@ class HouseholdMembershipTests(TestCase):
         self.assertTrue(HouseholdMembership.objects.filter(user=self.user_two, household=household).exists())
         self.assertRedirects(response, reverse('dashboard'))
 
+    def test_unauthenticated_user_is_redirected_to_login(self):
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response.url)
+
+    def test_user_cannot_view_other_household_chore(self):
+        household_one = Household.objects.create(name='House One')
+        household_two = Household.objects.create(name='House Two')
+        HouseholdMembership.objects.create(user=self.user_one, household=household_one)
+        HouseholdMembership.objects.create(user=self.user_two, household=household_two)
+
+        chore = Chore.objects.create(
+            household=household_two,
+            title='Do laundry',
+            created_by=self.user_two,
+            assignee=self.user_two,
+        )
+
+        self.client.login(username='alice', password='secretpass123')
+        response = self.client.get(reverse('edit_chore', args=[chore.pk]))
+
+        self.assertEqual(response.status_code, 404)
+
 
 class ChoreModelTests(TestCase):
     def test_chore_can_be_created_for_household(self):
@@ -89,3 +113,32 @@ class ChoreModelTests(TestCase):
 
         self.assertEqual(chore.activities.count(), 1)
         self.assertEqual(chore.activities.first().user, user)
+
+    def test_dashboard_filters_chores_by_assignee_and_status(self):
+        user_one = get_user_model().objects.create_user(username='frank', password='secretpass123')
+        user_two = get_user_model().objects.create_user(username='grace', password='secretpass123')
+        household = Household.objects.create(name='Shared House')
+        HouseholdMembership.objects.create(user=user_one, household=household)
+        HouseholdMembership.objects.create(user=user_two, household=household)
+
+        Chore.objects.create(
+            household=household,
+            title='Wash dishes',
+            created_by=user_one,
+            assignee=user_one,
+            status=Chore.STATUS_PENDING,
+        )
+        Chore.objects.create(
+            household=household,
+            title='Vacuum room',
+            created_by=user_two,
+            assignee=user_two,
+            status=Chore.STATUS_COMPLETED,
+        )
+
+        self.client.login(username='frank', password='secretpass123')
+        response = self.client.get(reverse('dashboard'), {'assignee': user_two.pk, 'status': Chore.STATUS_COMPLETED})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['chores']), 1)
+        self.assertEqual(response.context['chores'][0].title, 'Vacuum room')
