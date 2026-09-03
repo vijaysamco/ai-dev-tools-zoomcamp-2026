@@ -1,10 +1,10 @@
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import HouseholdForm, JoinHouseholdForm, SignUpForm
-from .models import Household, HouseholdMembership
+from .forms import ChoreForm, HouseholdForm, JoinHouseholdForm, SignUpForm
+from .models import Chore, ChoreActivity, Household, HouseholdMembership
 
 
 def signup(request):
@@ -31,7 +31,13 @@ def dashboard(request):
     }
 
     if household:
-        context['members'] = household.members.select_related('user').all()
+        members = household.members.select_related('user').all()
+        chores = household.chores.select_related('assignee', 'created_by').all()
+        activity = ChoreActivity.objects.filter(chore__household=household).select_related('user', 'chore')[:10]
+        context['members'] = members
+        context['chores'] = chores
+        context['chore_form'] = ChoreForm(household=household)
+        context['activity'] = activity
 
     return render(request, 'dashboard.html', context)
 
@@ -73,5 +79,101 @@ def join_household(request):
             HouseholdMembership.objects.create(user=request.user, household=household)
             messages.success(request, f"You joined '{household.name}'.")
             return redirect('dashboard')
+
+    return redirect('dashboard')
+
+
+@login_required
+def create_chore(request):
+    membership = getattr(request.user, 'household_membership', None)
+    if not membership:
+        messages.error(request, 'Create or join a household before adding chores.')
+        return redirect('dashboard')
+
+    if request.method == 'POST':
+        form = ChoreForm(request.POST, household=membership.household)
+        if form.is_valid():
+            chore = form.save(commit=False)
+            chore.household = membership.household
+            chore.created_by = request.user
+            chore.save()
+            chore.record_activity(
+                request.user,
+                ChoreActivity.ACTION_CREATED,
+                f"Created '{chore.title}'",
+            )
+            if chore.assignee and chore.assignee != request.user:
+                chore.record_activity(
+                    request.user,
+                    ChoreActivity.ACTION_ASSIGNED,
+                    f"Assigned to {chore.assignee.username}",
+                )
+            messages.success(request, 'Chore created successfully.')
+            return redirect('dashboard')
+        messages.error(request, 'Please correct the chore form and try again.')
+
+    return redirect('dashboard')
+
+
+@login_required
+def edit_chore(request, chore_id):
+    membership = getattr(request.user, 'household_membership', None)
+    household = membership.household if membership else None
+    chore = get_object_or_404(Chore, pk=chore_id, household=household)
+
+    if request.method == 'POST':
+        old_assignee = chore.assignee
+        old_status = chore.status
+        form = ChoreForm(request.POST, instance=chore, household=household)
+        if form.is_valid():
+            updated = form.save()
+            if updated.assignee != old_assignee:
+                updated.record_activity(
+                    request.user,
+                    ChoreActivity.ACTION_ASSIGNED,
+                    f"Assigned to {updated.assignee.username if updated.assignee else 'unassigned'}",
+                )
+            if updated.status != old_status:
+                if updated.status == Chore.STATUS_COMPLETED:
+                    updated.record_activity(
+                        request.user,
+                        ChoreActivity.ACTION_COMPLETED,
+                        f"Marked as completed",
+                    )
+                else:
+                    updated.record_activity(
+                        request.user,
+                        ChoreActivity.ACTION_UPDATED,
+                        f"Status changed to {updated.get_status_display()}",
+                    )
+            if not updated.assignee and old_assignee is not None:
+                updated.record_activity(
+                    request.user,
+                    ChoreActivity.ACTION_UPDATED,
+                    'Removed assignee',
+                )
+            updated.record_activity(
+                request.user,
+                ChoreActivity.ACTION_UPDATED,
+                'Chore details updated',
+            )
+            messages.success(request, 'Chore updated successfully.')
+            return redirect('dashboard')
+    else:
+        form = ChoreForm(instance=chore, household=household)
+
+    return render(request, 'chore_form.html', {'form': form, 'chore': chore})
+
+
+@login_required
+def delete_chore(request, chore_id):
+    membership = getattr(request.user, 'household_membership', None)
+    household = membership.household if membership else None
+    chore = get_object_or_404(Chore, pk=chore_id, household=household)
+
+    if request.method == 'POST':
+        chore.record_activity(request.user, ChoreActivity.ACTION_DELETED, f"Deleted '{chore.title}'")
+        chore.delete()
+        messages.success(request, 'Chore deleted successfully.')
 
     return redirect('dashboard')

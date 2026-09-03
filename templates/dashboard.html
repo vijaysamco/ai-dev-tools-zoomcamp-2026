@@ -7,12 +7,74 @@
         <h1>{{ household.name }}</h1>
         <p class="muted">Invite code: <strong>{{ household.code }}</strong></p>
 
-        <h2>Members</h2>
+        <div class="grid">
+            <div>
+                <h2>Members</h2>
+                <ul>
+                    {% for member in members %}
+                        <li>{{ member.user.username }}</li>
+                    {% empty %}
+                        <li>No members yet.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <div>
+                <h2>Add chore</h2>
+                <form method="post" action="{% url 'create_chore' %}">
+                    {% csrf_token %}
+                    {{ chore_form.as_p }}
+                    <button type="submit">Create chore</button>
+                </form>
+            </div>
+        </div>
+
+        <h2>Household chores</h2>
+        {% if chores %}
+            <table style="width:100%; border-collapse: collapse; margin-top:1rem;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; padding:0.5rem;">Title</th>
+                        <th style="text-align:left; padding:0.5rem;">Assignee</th>
+                        <th style="text-align:left; padding:0.5rem;">Due</th>
+                        <th style="text-align:left; padding:0.5rem;">Status</th>
+                        <th style="text-align:left; padding:0.5rem;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for chore in chores %}
+                        <tr>
+                            <td style="padding:0.5rem; border-top:1px solid #e5e7eb;">{{ chore.title }}</td>
+                            <td style="padding:0.5rem; border-top:1px solid #e5e7eb;">{{ chore.assignee.username|default:'Unassigned' }}</td>
+                            <td style="padding:0.5rem; border-top:1px solid #e5e7eb;">{{ chore.due_date|default:'-' }}</td>
+                            <td style="padding:0.5rem; border-top:1px solid #e5e7eb;">{{ chore.get_status_display }}</td>
+                            <td style="padding:0.5rem; border-top:1px solid #e5e7eb;">
+                                <a href="{% url 'edit_chore' chore.id %}">Edit</a>
+                                |
+                                <form method="post" action="{% url 'delete_chore' chore.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" style="padding:0.25rem 0.5rem; background:#dc2626;">Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p class="muted">No chores yet. Create the first one above.</p>
+        {% endif %}
+
+        <h2>Recent activity</h2>
         <ul>
-            {% for member in members %}
-                <li>{{ member.user.username }}</li>
+            {% for entry in activity %}
+                <li>
+                    <strong>{{ entry.user.username }}</strong>
+                    {{ entry.get_action_display|lower }}
+                    {% if entry.details %}— {{ entry.details }}{% endif %}
+                    <span class="muted">({{ entry.created_at|date:'M d, Y H:i' }})</span>
+                </li>
             {% empty %}
-                <li>No members yet.</li>
+                <li>No activity yet.</li>
             {% endfor %}
         </ul>
     {% else %}
