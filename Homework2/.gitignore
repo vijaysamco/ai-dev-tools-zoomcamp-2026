@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+.venv*
+venv/
+.env
+.env.*
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# uv
+.uv-cache/
+
+# FastAPI / app
+*.sqlite3
+*.db
+
+# Node
+node_modules/
+.npm/
+.pnpm-store/
+
+# Build output
+frontend/dist/
+frontend/build/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
