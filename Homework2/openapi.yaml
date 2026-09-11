@@ -1,0 +1,238 @@
+openapi: 3.0.3
+info:
+  title: SplitEase API
+  version: 1.0.0
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+  /groups:
+    get:
+      summary: List groups
+      responses:
+        '200':
+          description: A list of groups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+    post:
+      summary: Create a new group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateGroupRequest'
+      responses:
+        '201':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+  /groups/{group_id}/members:
+    get:
+      summary: List members in a group
+      parameters:
+        - in: path
+          name: group_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+    post:
+      summary: Add a member to a group
+      parameters:
+        - in: path
+          name: group_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMemberRequest'
+      responses:
+        '201':
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+  /groups/{group_id}/expenses:
+    get:
+      summary: List expenses for a group
+      parameters:
+        - in: path
+          name: group_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of expenses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+    post:
+      summary: Add expense to a group
+      parameters:
+        - in: path
+          name: group_id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '201':
+          description: Expense created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+  /groups/{group_id}/balances:
+    get:
+      summary: Get balances for a group
+      parameters:
+        - in: path
+          name: group_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of member balances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Balance'
+components:
+  schemas:
+    Group:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    Member:
+      type: object
+      required: [id, group_id, name]
+      properties:
+        id:
+          type: string
+        group_id:
+          type: string
+        name:
+          type: string
+    Expense:
+      type: object
+      required: [id, group_id, description, amount, payer_id, split_type, participant_ids, date]
+      properties:
+        id:
+          type: string
+        group_id:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+          format: float
+        payer_id:
+          type: string
+        split_type:
+          type: string
+          enum: [equal, custom]
+        participant_ids:
+          type: array
+          items:
+            type: string
+        custom_shares:
+          type: object
+          additionalProperties:
+            type: number
+        date:
+          type: string
+          format: date
+    CreateGroupRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    CreateMemberRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    CreateExpenseRequest:
+      type: object
+      required: [description, amount, payer_id, split_type, participant_ids, date]
+      properties:
+        description:
+          type: string
+        amount:
+          type: number
+          format: float
+        payer_id:
+          type: string
+        split_type:
+          type: string
+          enum: [equal, custom]
+        participant_ids:
+          type: array
+          items:
+            type: string
+        custom_shares:
+          type: object
+          additionalProperties:
+            type: number
+        date:
+          type: string
+          format: date
+    Balance:
+      type: object
+      required: [member_id, name, balance]
+      properties:
+        member_id:
+          type: string
+        name:
+          type: string
+        balance:
+          type: number
+          format: float
