@@ -45,5 +45,9 @@ npm install
 npm run dev
 ```
 
+## Screenshot
+
+![SplitEase dashboard](assets/splitease-dashboard.png)
+
 ## Notes
 This is an intentionally simple MVP and is meant to follow the project specification in `_docs/spec.md`.
