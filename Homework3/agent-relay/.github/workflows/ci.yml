@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: relay
+          POSTGRES_USER: relay
+          POSTGRES_PASSWORD: relay
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U relay -d relay"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: latest
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: uv
+
+      - name: Install dependencies
+        run: uv sync --locked --dev
+
+      - name: Run protocol tests
+        run: uv run pytest -q test_agent_relay.py
+
+      - name: Start relay
+        env:
+          RELAY_DATABASE_URL: postgresql+psycopg://relay:relay@127.0.0.1:5432/relay
+        run: |
+          uv run uvicorn main:app --host 127.0.0.1 --port 8000 > relay.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health > /dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail http://127.0.0.1:8000/health
+
+      - name: Run live API integration test
+        env:
+          RELAY_API_BASE_URL: http://127.0.0.1:8000
+        run: uv run pytest -q test_integration.py
+
+      - name: Upload relay log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relay-log
+          path: relay.log

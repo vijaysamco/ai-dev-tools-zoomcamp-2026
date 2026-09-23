@@ -1,0 +1,118 @@
+# Agent Relay
+
+Agent Relay is a small FastAPI service for registering agents, delivering one
+task at a time, and recording results. PostgreSQL persists the queue and
+attempts, while workers execute tasks on their own machines. The included
+worker deterministically returns `input.upper()`.
+
+## Run it
+
+```bash
+docker compose up --build
+```
+
+Open <http://127.0.0.1:8000/> for the token-based local dashboard. The default
+database is the Compose `postgres` service. `RELAY_DATABASE_URL` can be set to
+connect to another PostgreSQL instance. `GET /health` is a liveness check and
+`GET /ready` verifies database connectivity and schema.
+
+For local development without Compose, install dependencies with `uv sync`,
+start PostgreSQL, set `RELAY_DATABASE_URL`, and run:
+
+```bash
+uv run uvicorn main:app --reload
+```
+
+Register two identities and send a task:
+
+```bash
+alice=$(curl -sS -X POST http://127.0.0.1:8000/api/v1/agents \
+  -H 'content-type: application/json' -d '{"name":"alice"}')
+bob=$(curl -sS -X POST http://127.0.0.1:8000/api/v1/agents \
+  -H 'content-type: application/json' -d '{"name":"uppercase"}')
+```
+
+The response contains each agent's secret `token` once. Keep it outside source
+control. Use `Authorization: Bearer <token>` for all subsequent API calls;
+registration is the only unauthenticated endpoint. For a shared installation,
+set `RELAY_ENROLLMENT_SECRET` and send it as `X-Enrollment-Secret` when
+registering.
+
+## Run the deterministic worker
+
+The worker can register itself and save credentials in a mode-0600 JSON file:
+
+```bash
+uv run python main.py worker \
+  --base-url http://127.0.0.1:8000 \
+  --name uppercase \
+  --credentials ./uppercase-credentials.json \
+  --worker-id laptop-1
+```
+
+For failure/redelivery demonstrations, make local execution intentionally slow
+and stop the process after one completion:
+
+```bash
+uv run python main.py worker --credentials ./uppercase-credentials.json \
+  --slow-seconds 75 --worker-id slow-laptop
+```
+
+The worker heartbeats during long work. Killing it leaves the claim leased;
+after the 60-second lease expires, another worker can claim the task with a new
+token and incremented attempt number. `RELAY_LEASE_SECONDS` and
+`RELAY_MAX_ATTEMPTS` are configurable server settings.
+
+An existing credential can also be supplied explicitly (the token is not
+written to disk):
+
+```bash
+uv run python main.py worker --agent-id agent_123 --token agt_… --worker-id laptop-2
+```
+
+## Storage and delivery behavior
+
+`database.py` contains SQLAlchemy models and PostgreSQL transaction setup.
+`storage.py` contains task/claim/recovery operations; routes and request models
+are kept in `main.py` and `schemas.py`. PostgreSQL row locks with
+`FOR UPDATE SKIP LOCKED` make concurrent claims safe across API/worker
+processes.
+
+Claims are at-least-once and leased for 60 seconds by default. Heartbeats extend
+an active lease. A completion or failure must include the recipient's bearer
+token and claim token. Repeating the exact terminal request with that claim
+token is idempotent; a stale token or different result receives `409`.
+
+## Verify
+
+The test suite covers the main protocol, sender/recipient access boundaries,
+hashed claim-token behavior, idempotent terminal retries, concurrent claims,
+lease expiry before and after recovery, pagination/error shape, and dashboard
+asset serving:
+
+```bash
+uv run pytest -q
+```
+
+The first acceptance scenario can be exercised against a running relay and
+its real database with:
+
+```bash
+RELAY_API_BASE_URL=http://127.0.0.1:8000 uv run pytest -q test_integration.py
+```
+
+On PowerShell:
+
+```powershell
+$env:RELAY_API_BASE_URL = "http://127.0.0.1:8000"
+uv run pytest -q test_integration.py
+```
+
+The integration test registers two agents, sends a task, claims it, completes
+it, and retrieves the persisted result through HTTP.
+
+The protocol tests use an isolated SQLite database for speed. The integration
+test uses the running PostgreSQL-backed API and does not reset its database.
+
+This project intentionally does not include Kubernetes, external brokers, or
+an LLM. Those are deployment concerns outside the local relay protocol.
